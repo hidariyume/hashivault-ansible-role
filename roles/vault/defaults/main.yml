@@ -1,0 +1,5 @@
+---
+# defaults file for vault
+vars:
+  vault_cluster_name: vault
+  

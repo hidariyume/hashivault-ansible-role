@@ -1,0 +1,91 @@
+---
+#Configures and initializes leader node with variables from variables.yml and outputs this to vault_init_output in yaml-format.
+- name: Configure the leader 
+  block:
+    - name: Initialize the Vault leader
+      command:
+        cmd: "vault operator init -key-shares={{ vault_key_shares }} -key-threshold={{ vault_key_threshhold }} -format=yaml"
+      register: vault_init_output
+      environment:
+        VAULT_ADDR: "http://{{ ansible_default_ipv4.address }}:8200"
+      when: 
+        - not vault_status.initialized | bool
+
+    - name: Save Vault init yaml-output to variables
+      set_fact:
+        vault_init_output: "{{ vault_init_output.stdout | from_yaml }}"
+      when:
+        - vault_init_output is defined
+        - vault_init_output.stdout is defined
+
+#Unseals leader with keys gathered from vault_init_output.
+    - name: Unseal the leader with keys
+      command:
+        cmd: vault operator unseal {{ item }}
+      environment:
+        VAULT_ADDR: "http://{{ ansible_default_ipv4.address }}:8200"
+      loop: "{{ vault_init_output.unseal_keys_b64 }}"
+      when:
+        - vault_init_output is defined
+        - vault_init_output.stdout is defined
+        - vault_status.sealed | bool
+        
+#Unseals leader with keys from variables.yml if master is already initialized and keys have been defined in variable.
+    - name: Unseal the leader with variable keys
+      command:
+        cmd: vault operator unseal {{ item }}
+      environment:
+        VAULT_ADDR: "http://{{ ansible_default_ipv4.address }}:8200"
+      loop: "{{ vault_key }}"
+      when:
+        - vault_status.sealed | bool
+        - vault_init_output.stdout is undefined
+        - vault_key is defined
+
+#Checks if saved file with keys and token exists on master node and creates them if not.
+    - name: Check if .vault-keys exists
+      stat:
+        path: /root/.vault-keys
+      register: vault_keys_file
+
+    - name: Check if .vault-token exists
+      stat:
+        path: /root/.vault-token
+      register: vault_token_file
+
+    - name: Save Vault unseal keys to /root/.vault-keys
+      copy:
+        content: "{{ vault_init_output.unseal_keys_b64 }}"
+        dest: /root/.vault-keys
+        owner: root
+        group: root
+        mode: "0640"
+      when: not vault_keys_file.stat.exists
+
+
+    - name: Save root token to /root/.vault-token
+      copy:
+        content: "{{ vault_init_output.root_token }}"
+        dest: /root/.vault-token
+        owner: root
+        group: root
+        mode: "0640"
+      when: not vault_token_file.stat.exists
+
+# Saves status of master for debug purposes, will be removed later.
+- name: Check Vault status
+  command:
+    cmd: vault status -format=yaml
+  environment:
+    VAULT_ADDR: "http://{{ ansible_default_ipv4.address }}:8200"
+  register: vault_status_raw
+  failed_when:
+    - vault_status_raw.rc == 1
+
+- name: Save Vault status
+  set_fact:
+    vault_status: "{{ vault_status_raw.stdout | from_yaml }}"
+- debug: msg="{{ vault_status }}"
+
+  # Only run this for the first host
+  run_once: yes

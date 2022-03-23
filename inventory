@@ -1,0 +1,7 @@
+[vault]
+node01
+node02
+node03
+
+[vault_leader]
+node01

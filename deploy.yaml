@@ -1,0 +1,7 @@
+---
+- hosts: vault
+  roles:
+    - roles/vault
+  become: true
+  vars_files:
+    - variables.yml

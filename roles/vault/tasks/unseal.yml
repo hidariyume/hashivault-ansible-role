@@ -1,0 +1,9 @@
+---
+- name: Unseal Vault
+  command:
+    cmd: vault operator unseal {{ item }}
+  environment:
+    VAULT_ADDR: "http://{{ ansible_default_ipv4.address }}:8200"
+  loop: "{{ vault_init_output.unseal_keys_b64 }}"
+  when:
+    - vault_status.sealed | bool

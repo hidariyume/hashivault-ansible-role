@@ -1,0 +1,14 @@
+#Name of the cluster.
+vault_cluster_name: vault-cluster
+
+#Amount of keys to create on init of master.
+vault_key_shares: 6
+
+#Amount of keys needed to unseal master.
+vault_key_threshhold: 3
+
+#vault_key is only needed on rerun after master has been initialized. List of minimum 3 keys.
+#vault_key: [""]
+
+# Snapshot configuration not implemented to role yet.
+#snapshot_path: /opt/vault

@@ -1,0 +1,48 @@
+---
+- name: Add HashiCorp apt key
+  apt_key:
+    url: https://apt.releases.hashicorp.com/gpg
+    state: present
+
+- name: Add HashiCorp repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://apt.releases.hashicorp.com {{ ansible_lsb['codename'] }} main"
+    state: present
+    update_cache: yes
+
+
+# Installing Vault will create the /opt/vault/ directory strucutre as well as the /etc/vault.d directory
+- name: Install HashiCorp Vault
+  apt:
+    name: vault
+    state: present
+
+
+# Config-template.hcl is a jinja template which is copied into the /etc/vault.d directory
+- name: Create config from template
+  template:
+    src: templates/config-template.hcl
+    dest: "/etc/vault.d/vault.hcl"
+  
+
+# Enabling the vault service will start the vault server with the /etc/vault.d/vault.hcl config
+- name: Enable Vault service
+  systemd:
+    state: restarted
+    name: vault
+    daemon_reload: yes
+
+- name: Check Vault status
+  command:
+    cmd: vault status -format=yaml
+  environment:
+    VAULT_ADDR: "http://{{ ansible_default_ipv4.address }}:8200"
+  register: vault_status_raw
+  failed_when:
+    - vault_status_raw.rc == 1
+
+- name: Save Vault status
+  set_fact:
+    vault_status: "{{ vault_status_raw.stdout | from_yaml }}"
+- debug: msg="{{ vault_status }}"
+

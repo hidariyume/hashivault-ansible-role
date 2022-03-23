@@ -1,0 +1,33 @@
+---
+# Joins current node to node in vault_leader-group in inventory.
+- name: Join raft cluster to leader
+  command:
+    cmd: vault operator raft join -tls-skip-verify http://{{ hostvars[item]['ansible_default_ipv4']['address'] }}:8200
+    chdir: /opt/vault
+  with_items : "{{ groups.vault_leader }}"
+  environment:
+    VAULT_ADDR: "http://{{ ansible_default_ipv4.address }}:8200"
+
+# Unseals with keys in vault_init_output gathered from master init.
+- name: Unseal the follower with keys
+  command:
+    cmd: vault operator unseal {{ item }}
+  environment:
+    VAULT_ADDR: "http://{{ ansible_default_ipv4.address }}:8200"
+  loop: "{{ vault_init_output.unseal_keys_b64 }}"
+  when:
+    - vault_init_output is defined
+    - vault_init_output.stdout is defined
+    - vault_status.sealed | bool
+
+# Unseals with keys specified in variables.yml if master is already initialized before run.
+- name: Unseal the follower with variable keys
+  command:
+    cmd: vault operator unseal {{ item }}
+  environment:
+    VAULT_ADDR: "http://{{ ansible_default_ipv4.address }}:8200"
+  loop: "{{ vault_key }}"
+  when:
+    - vault_status.sealed | bool
+    - vault_init_output.stdout is undefined
+    - vault_key is defined

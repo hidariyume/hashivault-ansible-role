@@ -1,0 +1,17 @@
+---
+- name: Install Vault
+  include_tasks: install.yml
+
+- name: Initalize the leader
+  include_tasks: 
+    file: initialize-leader.yml
+  when: inventory_hostname in groups['vault_leader']
+
+- name: Unseal followers and join cluster
+  include_tasks: 
+    file: followers.yml
+  when: inventory_hostname not in groups['vault_leader']
+
+
+
+
